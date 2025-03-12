@@ -105,8 +105,9 @@ func (g *Game) Update() error {
 		return nil
 	}
 
-	// 如果游戏已结束，只处理重新开始的输入
+	// 如果游戏已结束，处理重新开始或返回菜单的输入
 	if g.isGameOver {
+		// 按空格键重新开始当前模式
 		if ebiten.IsKeyPressed(ebiten.KeySpace) {
 			// 重置游戏状态
 			g.player = NewPlayer()
@@ -116,6 +117,12 @@ func (g *Game) Update() error {
 			g.powerUpManager = NewPowerUpManager()
 			g.score = 0
 			g.isGameOver = false
+		}
+		// 按ESC键返回模式选择界面
+		if ebiten.IsKeyPressed(ebiten.KeyEscape) {
+			g.gameMode = ModeMenu
+			g.isGameOver = false
+			g.score = 0
 		}
 		return nil
 	}
@@ -261,8 +268,31 @@ func (g *Game) Draw(screen *ebiten.Image) {
 
 	// 如果游戏结束，显示游戏结束信息
 	if g.isGameOver {
-		msg := fmt.Sprintf("游戏结束！最终得分：%d\n按空格键重新开始", g.score)
-		ebitenutil.DebugPrintAt(screen, msg, screenWidth/2-150, screenHeight/2)
+		// 绘制半透明背景
+		ebitenutil.DrawRect(screen, 0, float64(screenHeight)/3, float64(screenWidth), float64(screenHeight)/3, color.RGBA{0, 0, 0, 128})
+
+		// 绘制游戏结束标题
+		gameOverMsg := "游戏结束！"
+		gameOverX := screenWidth/2 - 80
+		gameOverY := screenHeight/2 - 30
+		text.Draw(screen, gameOverMsg, chineseFont, gameOverX, gameOverY, color.White)
+
+		// 绘制最终得分
+		scoreMsg := fmt.Sprintf("最终得分：%d", g.score)
+		scoreX := screenWidth/2 - 80
+		scoreY := screenHeight/2
+		text.Draw(screen, scoreMsg, chineseFont, scoreX, scoreY, color.White)
+
+		// 绘制操作提示
+		restartMsg := "按空格键重新开始当前模式"
+		restartX := screenWidth/2 - 150
+		restartY := screenHeight/2 + 30
+		text.Draw(screen, restartMsg, chineseFont, restartX, restartY, color.White)
+
+		menuMsg := "按ESC键返回模式选择"
+		menuX := screenWidth/2 - 100
+		menuY := screenHeight/2 + 60
+		text.Draw(screen, menuMsg, chineseFont, menuX, menuY, color.White)
 	}
 }
 
