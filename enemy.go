@@ -53,6 +53,7 @@ type EnemyManager struct {
 	enemies []*Enemy
 	spawnTimer int
 	spawnInterval int
+	difficulty float64 // 添加难度系数字段
 }
 
 // NewEnemyManager 创建一个新的敌机管理器
@@ -61,7 +62,8 @@ func NewEnemyManager() *EnemyManager {
 	return &EnemyManager{
 		enemies: make([]*Enemy, 0),
 		spawnTimer: 0,
-		spawnInterval: 60, // 每60帧生成一个新敌机
+		spawnInterval: 60, // 初始生成间隔为60帧
+		difficulty: 1.0, // 初始难度系数
 	}
 }
 
@@ -79,7 +81,10 @@ func (em *EnemyManager) Update() {
 	// 生成新敌机
 	em.spawnTimer++
 	if em.spawnTimer >= em.spawnInterval {
-		em.enemies = append(em.enemies, NewEnemy())
+		enemy := NewEnemy()
+		// 根据难度调整敌机速度
+		enemy.speed *= em.difficulty
+		em.enemies = append(em.enemies, enemy)
 		em.spawnTimer = 0
 	}
 }

@@ -13,9 +13,9 @@ type Player struct {
 	speed float64
 	width int
 	height int
-	multiShotEnabled bool
+	multiShotCount int    // 永久性多弹道数量
 	screenShotEnabled bool
-	powerUpTimer int
+	powerUpTimer int     // 用于控制全屏攻击的持续时间
 }
 
 // NewPlayer 创建一个新的玩家飞机
@@ -26,13 +26,13 @@ func NewPlayer() *Player {
 		speed: 4,
 		width: 32,
 		height: 32,
+		multiShotCount: 0,
 	}
 }
 
 // EnableMultiShot 启用多弹道能力
 func (p *Player) EnableMultiShot() {
-	p.multiShotEnabled = true
-	p.powerUpTimer = 300 // 能力持续300帧（约5秒）
+	p.multiShotCount++  // 永久增加一个弹道
 }
 
 // EnableScreenShot 启用全屏攻击能力
@@ -57,11 +57,10 @@ func (p *Player) Update() {
 		p.y += p.speed
 	}
 
-	// 更新能力状态
-	if p.multiShotEnabled || p.screenShotEnabled {
+	// 更新全屏攻击状态
+	if p.screenShotEnabled {
 		p.powerUpTimer--
 		if p.powerUpTimer <= 0 {
-			p.multiShotEnabled = false
 			p.screenShotEnabled = false
 		}
 	}

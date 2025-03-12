@@ -89,9 +89,12 @@ func (pm *PowerUpManager) SpawnPowerUp(x, y float64) {
 	// 根据玩家得分增加掉落概率，每1000分增加5%的掉落概率，最高不超过60%
 	scoreBonus := math.Min(float64(score)/1000.0*0.05, 0.25)
 	if rand.Float64() < baseProb+scoreBonus {
-		// 随机选择道具类型
-		pType := PowerUpType(rand.Intn(2))
-		pm.powerUps = append(pm.powerUps, NewPowerUp(x, y, pType))
+		// 随机选择道具类型，降低全屏攻击道具的掉落概率
+		if rand.Float64() < 0.3 { // 30%概率掉落全屏攻击道具
+			pm.powerUps = append(pm.powerUps, NewPowerUp(x, y, ScreenShot))
+		} else {
+			pm.powerUps = append(pm.powerUps, NewPowerUp(x, y, MultiShot))
+		}
 	}
 }
 
