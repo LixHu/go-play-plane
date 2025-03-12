@@ -1,2 +1,14 @@
-# go-play-plane
-A handjob mini-game implemented with Go
+# 打飞机
+一个简单打飞机小游戏
+
+### 说明
+欢迎提供想法来实现，开源出来自己玩
+
+### 运行
+ clone 当前项目到本地
+
+```Go
+go mod tidy
+
+go run .
+```
