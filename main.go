@@ -20,6 +20,7 @@ type Game struct {
 	enemyManager *EnemyManager
 	bulletManager *BulletManager
 	enemyBulletManager *EnemyBulletManager
+	powerUpManager *PowerUpManager
 	score int
 	isGameOver bool
 }
@@ -34,6 +35,7 @@ func (g *Game) Update() error {
 			g.enemyManager = NewEnemyManager()
 			g.bulletManager = NewBulletManager()
 			g.enemyBulletManager = NewEnemyBulletManager()
+			g.powerUpManager = NewPowerUpManager()
 			g.score = 0
 			g.isGameOver = false
 		}
@@ -49,6 +51,9 @@ func (g *Game) Update() error {
 	// 更新子弹状态
 	g.bulletManager.Update(g.player)
 
+	// 更新道具状态
+	g.powerUpManager.Update()
+
 	// 检测子弹与敌机的碰撞
 	for _, bullet := range g.bulletManager.bullets {
 		for _, enemy := range g.enemyManager.enemies {
@@ -56,6 +61,22 @@ func (g *Game) Update() error {
 				bullet.active = false
 				enemy.active = false
 				g.score += 100
+				// 在敌机被击毁的位置生成道具
+				g.powerUpManager.SpawnPowerUp(enemy.x, enemy.y)
+			}
+		}
+	}
+
+	// 检测玩家与道具的碰撞
+	for _, powerUp := range g.powerUpManager.powerUps {
+		if powerUp.active && g.checkPlayerPowerUpCollision(powerUp) {
+			powerUp.active = false
+			// 根据道具类型给予玩家相应的能力
+			switch powerUp.pType {
+			case MultiShot:
+				g.player.EnableMultiShot()
+			case ScreenShot:
+				g.player.EnableScreenShot()
 			}
 		}
 	}
@@ -90,6 +111,14 @@ func (g *Game) checkPlayerCollision(enemy *Enemy) bool {
 		g.player.y+float64(g.player.height) > enemy.y
 }
 
+// checkPlayerPowerUpCollision 检测玩家与道具的碰撞
+func (g *Game) checkPlayerPowerUpCollision(powerUp *PowerUp) bool {
+	return g.player.x < powerUp.x+float64(powerUp.width) &&
+		g.player.x+float64(g.player.width) > powerUp.x &&
+		g.player.y < powerUp.y+float64(powerUp.height) &&
+		g.player.y+float64(g.player.height) > powerUp.y
+}
+
 // Draw 处理游戏画面渲染
 func (g *Game) Draw(screen *ebiten.Image) {
 	// 绘制玩家
@@ -98,11 +127,14 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	// 绘制敌机
 	g.enemyManager.Draw(screen)
 
-	// 绘制玩家子弹
+	// 绘制子弹
 	g.bulletManager.Draw(screen)
 
 	// 绘制敌机子弹
 	g.enemyBulletManager.Draw(screen)
+
+	// 绘制道具
+	g.powerUpManager.Draw(screen)
 
 	// 绘制分数
 	ebitenutil.DebugPrint(screen, fmt.Sprintf("Score: %d", g.score))
@@ -128,6 +160,7 @@ func main() {
 		enemyManager: NewEnemyManager(),
 		bulletManager: NewBulletManager(),
 		enemyBulletManager: NewEnemyBulletManager(),
+		powerUpManager: NewPowerUpManager(),
 		score: 0,
 		isGameOver: false,
 	}

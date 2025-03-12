@@ -91,7 +91,22 @@ func (bm *BulletManager) Update(player *Player) {
 		// 从玩家飞机的中心位置发射子弹
 		bulletX := player.x + float64(player.width)/2 - 2
 		bulletY := player.y
-		bm.bullets = append(bm.bullets, NewBullet(bulletX, bulletY))
+
+		// 根据玩家能力状态决定发射的子弹
+		if player.screenShotEnabled {
+			// 全屏攻击：发射一排子弹
+			for x := float64(0); x < float64(screenWidth); x += 32 {
+				bm.bullets = append(bm.bullets, NewBullet(x, bulletY))
+			}
+		} else if player.multiShotEnabled {
+			// 多弹道：发射三发子弹
+			bm.bullets = append(bm.bullets, NewBullet(bulletX-10, bulletY)) // 左边子弹
+			bm.bullets = append(bm.bullets, NewBullet(bulletX, bulletY))    // 中间子弹
+			bm.bullets = append(bm.bullets, NewBullet(bulletX+10, bulletY)) // 右边子弹
+		} else {
+			// 普通攻击：发射单发子弹
+			bm.bullets = append(bm.bullets, NewBullet(bulletX, bulletY))
+		}
 		bm.shootTimer = 0
 	}
 }

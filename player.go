@@ -13,6 +13,9 @@ type Player struct {
 	speed float64
 	width int
 	height int
+	multiShotEnabled bool
+	screenShotEnabled bool
+	powerUpTimer int
 }
 
 // NewPlayer 创建一个新的玩家飞机
@@ -24,6 +27,18 @@ func NewPlayer() *Player {
 		width: 32,
 		height: 32,
 	}
+}
+
+// EnableMultiShot 启用多弹道能力
+func (p *Player) EnableMultiShot() {
+	p.multiShotEnabled = true
+	p.powerUpTimer = 300 // 能力持续300帧（约5秒）
+}
+
+// EnableScreenShot 启用全屏攻击能力
+func (p *Player) EnableScreenShot() {
+	p.screenShotEnabled = true
+	p.powerUpTimer = 180 // 能力持续180帧（约3秒）
 }
 
 // Update 更新玩家飞机的状态
@@ -40,6 +55,15 @@ func (p *Player) Update() {
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyDown) && p.y < float64(screenHeight-p.height) {
 		p.y += p.speed
+	}
+
+	// 更新能力状态
+	if p.multiShotEnabled || p.screenShotEnabled {
+		p.powerUpTimer--
+		if p.powerUpTimer <= 0 {
+			p.multiShotEnabled = false
+			p.screenShotEnabled = false
+		}
 	}
 }
 
