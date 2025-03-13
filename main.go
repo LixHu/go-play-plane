@@ -83,6 +83,7 @@ type Game struct {
 	gameMode           GameMode // 当前游戏模式
 	currentLevel       int      // 当前关卡（仅用于关卡模式）
 	difficulty         float64  // 游戏难度系数
+	targetScore        int      // 当前关卡目标分数
 }
 
 // Update 处理游戏逻辑更新
@@ -93,7 +94,8 @@ func (g *Game) Update() error {
 		if ebiten.IsKeyPressed(ebiten.Key1) {
 			g.gameMode = ModeLevels
 			g.currentLevel = 1
-			g.difficulty = 1.0
+			g.targetScore = g.currentLevel * 1000 // 每关目标分数为关卡数 * 1000
+			g.enemyManager.SetLevel(g.currentLevel)
 			return nil
 		}
 		// 按2选择无尽模式
@@ -117,6 +119,11 @@ func (g *Game) Update() error {
 			g.powerUpManager = NewPowerUpManager()
 			g.score = 0
 			g.isGameOver = false
+			if g.gameMode == ModeLevels {
+				g.currentLevel = 1
+				g.targetScore = g.currentLevel * 1000
+				g.enemyManager.SetLevel(g.currentLevel)
+			}
 		}
 		// 按ESC键返回模式选择界面
 		if ebiten.IsKeyPressed(ebiten.KeyEscape) {
@@ -148,6 +155,14 @@ func (g *Game) Update() error {
 				g.score += 100
 				// 在敌机被击毁的位置生成道具
 				g.powerUpManager.SpawnPowerUp(enemy.x, enemy.y)
+
+				// 在关卡模式下检查是否达到目标分数
+				if g.gameMode == ModeLevels && g.score >= g.targetScore {
+					// 进入下一关
+					g.currentLevel++
+					g.targetScore = g.currentLevel * 1000
+					g.enemyManager.SetLevel(g.currentLevel)
+				}
 			}
 		}
 	}
@@ -206,20 +221,25 @@ func (g *Game) checkPlayerPowerUpCollision(powerUp *PowerUp) bool {
 
 // Draw 处理游戏画面渲染
 func (g *Game) Draw(screen *ebiten.Image) {
-	// 在菜单模式下显示模式选择界面
 	if g.gameMode == ModeMenu {
+		// 绘制半透明背景
+		ebitenutil.DrawRect(screen, 0, 0, float64(screenWidth), float64(screenHeight), color.RGBA{0, 0, 50, 180})
+
 		// 绘制标题
 		titleMsg := "飞机大战"
 		titleX := screenWidth/2 - 100
 		titleY := screenHeight/3 - 30
-		// ebitenutil.DrawRect(screen, float64(titleX-10), float64(titleY-25), 220, 40, color.RGBA{0, 0, 100, 100})
-		text.Draw(screen, titleMsg, chineseFont, titleX, titleY, color.White)
+		// 标题背景
+		ebitenutil.DrawRect(screen, float64(titleX-20), float64(titleY-40), 240, 50, color.RGBA{0, 0, 100, 200})
+		text.Draw(screen, titleMsg, chineseFont, titleX, titleY, color.RGBA{255, 255, 255, 255})
 
 		// 绘制模式选择说明
 		modeTitle := "- 游戏模式选择 -"
 		modeTitleX := screenWidth/2 - 80
 		modeTitleY := screenHeight/2 - 50
-		text.Draw(screen, modeTitle, chineseFont, modeTitleX, modeTitleY, color.White)
+		// 模式选择背景
+		ebitenutil.DrawRect(screen, float64(modeTitleX-20), float64(modeTitleY-25), 200, 35, color.RGBA{0, 0, 100, 150})
+		text.Draw(screen, modeTitle, chineseFont, modeTitleX, modeTitleY, color.RGBA{200, 200, 255, 255})
 
 		// 绘制模式选项
 		mode1 := "[1] 关卡模式"
@@ -228,23 +248,27 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		mode2Desc := "无限挑战，直到失败"
 
 		mode1X := screenWidth/2 - 150
-		mode1Y := screenHeight / 2
+		mode1Y := screenHeight/2 + 20
 		mode2X := screenWidth/2 - 150
-		mode2Y := screenHeight/2 + 30
+		mode2Y := screenHeight/2 + 70
 
-		// 使用更大的字体大小
-		text.Draw(screen, mode1, chineseFont, mode1X, mode1Y, color.White)
+		// 模式选项背景
+		ebitenutil.DrawRect(screen, float64(mode1X-10), float64(mode1Y-25), 320, 40, color.RGBA{0, 0, 100, 100})
+		ebitenutil.DrawRect(screen, float64(mode2X-10), float64(mode2Y-25), 320, 40, color.RGBA{0, 0, 100, 100})
+
+		// 绘制模式选项文字
+		text.Draw(screen, mode1, chineseFont, mode1X, mode1Y, color.RGBA{255, 255, 0, 255})
 		text.Draw(screen, mode1Desc, chineseFont, mode1X+140, mode1Y, color.White)
-		text.Draw(screen, mode2, chineseFont, mode2X, mode2Y, color.White)
+		text.Draw(screen, mode2, chineseFont, mode2X, mode2Y, color.RGBA{255, 255, 0, 255})
 		text.Draw(screen, mode2Desc, chineseFont, mode2X+140, mode2Y, color.White)
 
-		// 绘制操作提示，使用更明显的颜色和位置
+		// 绘制操作提示
 		hint := "按对应数字键选择模式"
 		hintX := screenWidth/2 - 100
-		hintY := screenHeight * 2 / 3
-		// 绘制提示文字的背景
-		ebitenutil.DrawRect(screen, float64(hintX-10), float64(hintY-15), 220, 30, color.RGBA{0, 0, 100, 100})
-		text.Draw(screen, hint, chineseFont, hintX, hintY, color.White)
+		hintY := screenHeight*3/4 + 30
+		// 提示背景
+		ebitenutil.DrawRect(screen, float64(hintX-20), float64(hintY-25), 240, 35, color.RGBA{0, 0, 100, 150})
+		text.Draw(screen, hint, chineseFont, hintX, hintY, color.RGBA{200, 200, 255, 255})
 		return
 	}
 
@@ -264,35 +288,65 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	g.powerUpManager.Draw(screen)
 
 	// 绘制分数
-	ebitenutil.DebugPrint(screen, fmt.Sprintf("Score: %d", g.score))
+	scoreText := fmt.Sprintf("得分: %d", g.score)
+	scoreX := 20
+	scoreY := 30
+	// 分数背景
+	ebitenutil.DrawRect(screen, float64(scoreX-10), float64(scoreY-25), 150, 35, color.RGBA{0, 0, 100, 150})
+	text.Draw(screen, scoreText, chineseFont, scoreX, scoreY, color.RGBA{255, 255, 0, 255})
+
+	// 在关卡模式下显示当前关卡和目标分数
+	if g.gameMode == ModeLevels {
+		levelText := fmt.Sprintf("当前关卡: %d", g.currentLevel)
+		levelX := 20
+		levelY := 70
+		// 关卡背景
+		ebitenutil.DrawRect(screen, float64(levelX-10), float64(levelY-25), 150, 35, color.RGBA{0, 0, 100, 150})
+		text.Draw(screen, levelText, chineseFont, levelX, levelY, color.RGBA{255, 255, 0, 255})
+
+		targetText := fmt.Sprintf("目标分数: %d", g.targetScore)
+		targetX := 20
+		targetY := 110
+		// 目标分数背景
+		ebitenutil.DrawRect(screen, float64(targetX-10), float64(targetY-25), 150, 35, color.RGBA{0, 0, 100, 150})
+		text.Draw(screen, targetText, chineseFont, targetX, targetY, color.RGBA{255, 255, 0, 255})
+	}
 
 	// 如果游戏结束，显示游戏结束信息
 	if g.isGameOver {
 		// 绘制半透明背景
-		ebitenutil.DrawRect(screen, 0, float64(screenHeight)/3, float64(screenWidth), float64(screenHeight)/3, color.RGBA{0, 0, 0, 128})
+		ebitenutil.DrawRect(screen, 0, 0, float64(screenWidth), float64(screenHeight), color.RGBA{0, 0, 0, 180})
 
 		// 绘制游戏结束标题
 		gameOverMsg := "游戏结束！"
 		gameOverX := screenWidth/2 - 80
-		gameOverY := screenHeight/2 - 30
-		text.Draw(screen, gameOverMsg, chineseFont, gameOverX, gameOverY, color.White)
+		gameOverY := screenHeight/2 - 50
+		// 标题背景
+		ebitenutil.DrawRect(screen, float64(gameOverX-20), float64(gameOverY-35), 200, 45, color.RGBA{0, 0, 100, 200})
+		text.Draw(screen, gameOverMsg, chineseFont, gameOverX, gameOverY, color.RGBA{255, 50, 50, 255})
 
 		// 绘制最终得分
 		scoreMsg := fmt.Sprintf("最终得分：%d", g.score)
 		scoreX := screenWidth/2 - 80
-		scoreY := screenHeight/2
-		text.Draw(screen, scoreMsg, chineseFont, scoreX, scoreY, color.White)
+		scoreY := screenHeight / 2
+		// 得分背景
+		ebitenutil.DrawRect(screen, float64(scoreX-20), float64(scoreY-25), 200, 35, color.RGBA{0, 0, 100, 150})
+		text.Draw(screen, scoreMsg, chineseFont, scoreX, scoreY, color.RGBA{255, 255, 0, 255})
 
 		// 绘制操作提示
 		restartMsg := "按空格键重新开始当前模式"
 		restartX := screenWidth/2 - 150
-		restartY := screenHeight/2 + 30
-		text.Draw(screen, restartMsg, chineseFont, restartX, restartY, color.White)
-
+		restartY := screenHeight/2 + 50
 		menuMsg := "按ESC键返回模式选择"
 		menuX := screenWidth/2 - 100
-		menuY := screenHeight/2 + 60
-		text.Draw(screen, menuMsg, chineseFont, menuX, menuY, color.White)
+		menuY := screenHeight/2 + 90
+
+		// 提示背景
+		ebitenutil.DrawRect(screen, float64(restartX-10), float64(restartY-25), 320, 35, color.RGBA{0, 0, 100, 150})
+		ebitenutil.DrawRect(screen, float64(menuX-10), float64(menuY-25), 220, 35, color.RGBA{0, 0, 100, 150})
+
+		text.Draw(screen, restartMsg, chineseFont, restartX, restartY, color.RGBA{200, 200, 255, 255})
+		text.Draw(screen, menuMsg, chineseFont, menuX, menuY, color.RGBA{200, 200, 255, 255})
 	}
 }
 
