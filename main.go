@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"image/color"
 	"log"
-	"os"
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
@@ -51,7 +50,7 @@ func init() {
 	}
 
 	// 加载中文字体
-	chineseFontData, err := os.ReadFile("resources/fonts/SourceHanSansCN-Regular.ttf")
+	chineseFontData, err := chineseFontFS.ReadFile("resources/fonts/SourceHanSansCN-Regular.ttf")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -151,17 +150,20 @@ func (g *Game) Update() error {
 		for _, enemy := range g.enemyManager.enemies {
 			if bullet.CheckCollision(enemy) {
 				bullet.active = false
-				enemy.active = false
-				g.score += 100
-				// 在敌机被击毁的位置生成道具
-				g.powerUpManager.SpawnPowerUp(enemy.x, enemy.y)
+				enemy.health -= 1      // 减少敌机血量
+				if enemy.health <= 0 { // 只有当血量为0时才销毁敌机
+					enemy.active = false
+					g.score += 100
+					// 在敌机被击毁的位置生成道具
+					g.powerUpManager.SpawnPowerUp(enemy.x, enemy.y)
 
-				// 在关卡模式下检查是否达到目标分数
-				if g.gameMode == ModeLevels && g.score >= g.targetScore {
-					// 进入下一关
-					g.currentLevel++
-					g.targetScore = g.currentLevel * 1000
-					g.enemyManager.SetLevel(g.currentLevel)
+					// 在关卡模式下检查是否达到目标分数
+					if g.gameMode == ModeLevels && g.score >= g.targetScore {
+						// 进入下一关
+						g.currentLevel++
+						g.targetScore = g.currentLevel * 1000
+						g.enemyManager.SetLevel(g.currentLevel)
+					}
 				}
 			}
 		}

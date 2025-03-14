@@ -2,43 +2,51 @@ package main
 
 import (
 	"image/color"
+
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
 )
 
 // Player 表示玩家控制的飞机
 type Player struct {
-	x float64
-	y float64
-	speed float64
-	width int
-	height int
-	multiShotCount int    // 永久性多弹道数量
+	x                 float64
+	y                 float64
+	speed             float64
+	width             int
+	height            int
+	multiShotCount    int // 永久性多弹道数量
 	screenShotEnabled bool
-	powerUpTimer int     // 用于控制全屏攻击的持续时间
+	powerUpTimer      int // 用于控制全屏攻击的持续时间
+	attackPower       int // 攻击力
 }
 
 // NewPlayer 创建一个新的玩家飞机
 func NewPlayer() *Player {
 	return &Player{
-		x: float64(screenWidth) / 2,
-		y: float64(screenHeight) - 50,
-		speed: 4,
-		width: 32,
-		height: 32,
+		x:              float64(screenWidth) / 2,
+		y:              float64(screenHeight) - 50,
+		speed:          4,
+		width:          32,
+		height:         32,
 		multiShotCount: 0,
+		attackPower:    1,
 	}
 }
 
 // EnableMultiShot 启用多弹道能力
 func (p *Player) EnableMultiShot() {
-	p.multiShotCount++  // 永久增加一个弹道
+	p.multiShotCount++ // 永久增加一个弹道
 }
 
 // EnableScreenShot 启用全屏攻击能力
 func (p *Player) EnableScreenShot() {
 	p.screenShotEnabled = true
 	p.powerUpTimer = 180 // 能力持续180帧（约3秒）
+}
+
+// EnableAttackBoost 增加攻击力
+func (p *Player) EnableAttackBoost() {
+	p.attackPower++ // 永久增加一点攻击力
 }
 
 // Update 更新玩家飞机的状态

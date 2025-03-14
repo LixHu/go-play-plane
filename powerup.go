@@ -16,8 +16,9 @@ var score int
 type PowerUpType int
 
 const (
-	MultiShot PowerUpType = iota // 多弹道
-	ScreenShot                    // 全屏攻击
+	MultiShot   PowerUpType = iota // 多弹道
+	ScreenShot                     // 全屏攻击
+	AttackBoost                    // 攻击力增强
 )
 
 // PowerUp 表示道具
@@ -55,21 +56,6 @@ func (p *PowerUp) Update() {
 	}
 }
 
-// Draw 绘制道具
-func (p *PowerUp) Draw(screen *ebiten.Image) {
-	// 根据道具类型使用不同的颜色
-	var clr color.Color
-	switch p.pType {
-	case MultiShot:
-		clr = color.RGBA{0, 255, 0, 255} // 绿色表示多弹道
-	case ScreenShot:
-		clr = color.RGBA{0, 0, 255, 255} // 蓝色表示全屏攻击
-	}
-
-	// 绘制道具
-	ebitenutil.DrawRect(screen, p.x, p.y, float64(p.width), float64(p.height), clr)
-}
-
 // PowerUpManager 管理所有道具
 type PowerUpManager struct {
 	powerUps []*PowerUp
@@ -89,10 +75,13 @@ func (pm *PowerUpManager) SpawnPowerUp(x, y float64) {
 	// 根据玩家得分增加掉落概率，每1000分增加5%的掉落概率，最高不超过60%
 	scoreBonus := math.Min(float64(score)/1000.0*0.05, 0.25)
 	if rand.Float64() < baseProb+scoreBonus {
-		// 随机选择道具类型，降低全屏攻击道具的掉落概率
-		if rand.Float64() < 0.3 { // 30%概率掉落全屏攻击道具
+		// 随机选择道具类型
+		randVal := rand.Float64()
+		if randVal < 0.0005 { // 0.05%概率掉落攻击力增强道具
+			pm.powerUps = append(pm.powerUps, NewPowerUp(x, y, AttackBoost))
+		} else if randVal < 0.3005 { // 30%概率掉落全屏攻击道具
 			pm.powerUps = append(pm.powerUps, NewPowerUp(x, y, ScreenShot))
-		} else {
+		} else { // 其余概率掉落多弹道道具
 			pm.powerUps = append(pm.powerUps, NewPowerUp(x, y, MultiShot))
 		}
 	}
@@ -115,4 +104,21 @@ func (pm *PowerUpManager) Draw(screen *ebiten.Image) {
 	for _, powerUp := range pm.powerUps {
 		powerUp.Draw(screen)
 	}
+}
+
+// Draw 绘制道具
+func (p *PowerUp) Draw(screen *ebiten.Image) {
+	// 根据道具类型选择不同的颜色
+	var powerUpColor color.RGBA
+	switch p.pType {
+	case MultiShot:
+		powerUpColor = color.RGBA{0, 255, 0, 255} // 绿色
+	case ScreenShot:
+		powerUpColor = color.RGBA{0, 0, 255, 255} // 蓝色
+	case AttackBoost:
+		powerUpColor = color.RGBA{128, 0, 128, 255} // 紫色
+	}
+
+	// 绘制道具
+	ebitenutil.DrawRect(screen, p.x, p.y, float64(p.width), float64(p.height), powerUpColor)
 }

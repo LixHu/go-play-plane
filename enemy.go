@@ -2,6 +2,7 @@ package main
 
 import (
 	"image/color"
+	"math"
 	"math/rand"
 	"time"
 
@@ -17,6 +18,7 @@ type Enemy struct {
 	width  int
 	height int
 	active bool
+	health int // 敌机血量
 }
 
 // NewEnemy 创建一个新的敌机
@@ -28,6 +30,7 @@ func NewEnemy() *Enemy {
 		width:  32,
 		height: 32,
 		active: true,
+		health: 2, // 提高初始血量
 	}
 }
 
@@ -57,6 +60,7 @@ type EnemyManager struct {
 	gameTime      int     // 游戏时间计数器（以帧为单位）
 	maxEnemies    int     // 同时存在的最大敌机数量
 	level         int     // 当前关卡
+	healthScale   float64 // 血量缩放因子
 }
 
 // NewEnemyManager 创建一个新的敌机管理器
@@ -70,15 +74,8 @@ func NewEnemyManager() *EnemyManager {
 		gameTime:      0,   // 初始游戏时间
 		maxEnemies:    10,  // 初始最大敌机数量
 		level:         1,   // 初始关卡
+		healthScale:   1.0, // 初始血量缩放因子
 	}
-}
-
-// SetLevel 设置当前关卡并调整难度
-func (em *EnemyManager) SetLevel(level int) {
-	em.level = level
-	em.difficulty = 1.0 + float64(level-1)*0.2 // 每关增加0.2的难度系数
-	em.spawnInterval = max(20, 60-level*5)     // 每关减少5帧的生成间隔，最小20帧
-	em.maxEnemies = min(30, 10+level*2)        // 每关增加2个最大敌机数量，最大30个
 }
 
 // Update 更新所有敌机的状态
@@ -86,18 +83,9 @@ func (em *EnemyManager) Update() {
 	// 更新游戏时间
 	em.gameTime++
 
-	// 每30秒（1800帧）增加一次难度
-	if em.gameTime%1800 == 0 {
-		// 增加难度系数
-		em.difficulty += 0.1
-		// 减少生成间隔（最小为20帧）
-		if em.spawnInterval > 20 {
-			em.spawnInterval -= 5
-		}
-		// 增加最大敌机数量（最大为30）
-		if em.maxEnemies < 30 {
-			em.maxEnemies += 2
-		}
+	// 每600帧（10秒）增加一次敌机血量
+	if em.gameTime%600 == 0 {
+		em.healthScale *= 1.5 // 血量增加1.5倍
 	}
 
 	// 更新现有敌机
@@ -115,9 +103,19 @@ func (em *EnemyManager) Update() {
 		enemy := NewEnemy()
 		// 根据难度调整敌机速度
 		enemy.speed *= em.difficulty
+		// 根据时间调整敌机血量
+		enemy.health = int(math.Round(float64(enemy.health) * em.healthScale))
 		em.enemies = append(em.enemies, enemy)
 		em.spawnTimer = 0
 	}
+}
+
+// SetLevel 设置当前关卡并调整难度
+func (em *EnemyManager) SetLevel(level int) {
+	em.level = level
+	em.difficulty = 1.0 + float64(level-1)*0.2 // 每关增加0.2的难度系数
+	em.spawnInterval = max(20, 60-level*5)     // 每关减少5帧的生成间隔，最小20帧
+	em.maxEnemies = min(30, 10+level*2)        // 每关增加2个最大敌机数量，最大30个
 }
 
 // Draw 绘制所有敌机
