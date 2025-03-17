@@ -1,8 +1,10 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
-	"image/color"
+	"image"
+	"image/color" // 注册PNG格式支持
 	"log"
 
 	"github.com/hajimehoshi/ebiten/v2"
@@ -31,6 +33,8 @@ const (
 var (
 	gameFont    font.Face
 	chineseFont font.Face
+	enemyImage  *ebiten.Image
+	playerImage *ebiten.Image
 )
 
 func init() {
@@ -67,6 +71,59 @@ func init() {
 	})
 	if err != nil {
 		log.Fatal(err)
+	}
+
+	// 加载图片资源
+	enemyImage = ebiten.NewImage(32, 32)
+	enemyImage.Fill(color.RGBA{255, 0, 0, 255}) // 临时使用红色方块代替敌机
+
+	playerImage = ebiten.NewImage(32, 32)
+	playerImage.Fill(color.RGBA{0, 255, 0, 255}) // 临时使用绿色方块代替玩家
+
+	// 加载敌机图片
+	enemyImgData, err := imagesFS.ReadFile("resources/images/enemy.png")
+	if err != nil {
+		log.Printf("无法加载敌机图片，使用默认方块: %v", err)
+	} else {
+		// 从嵌入的资源创建图片
+		enemyImg, _, err := image.Decode(bytes.NewReader(enemyImgData))
+		if err != nil {
+			log.Printf("无法解码敌机图片，使用默认方块: %v", err)
+		} else {
+			// 创建指定大小的图片缓冲区
+			enemyImage = ebiten.NewImage(32, 32)
+			// 设置缩放选项
+			options := &ebiten.DrawImageOptions{}
+			// 计算缩放比例
+			scaleX := float64(32) / float64(enemyImg.Bounds().Dx())
+			scaleY := float64(32) / float64(enemyImg.Bounds().Dy())
+			options.GeoM.Scale(scaleX, scaleY)
+			// 将原始图片绘制到指定大小的缓冲区
+			enemyImage.DrawImage(ebiten.NewImageFromImage(enemyImg), options)
+		}
+	}
+
+	// 加载玩家图片
+	playerImgData, err := imagesFS.ReadFile("resources/images/player.png")
+	if err != nil {
+		log.Printf("无法加载玩家图片，使用默认方块: %v", err)
+	} else {
+		// 从嵌入的资源创建图片
+		playerImg, _, err := image.Decode(bytes.NewReader(playerImgData))
+		if err != nil {
+			log.Printf("无法解码玩家图片，使用默认方块: %v", err)
+		} else {
+			// 创建指定大小的图片缓冲区
+			playerImage = ebiten.NewImage(32, 32)
+			// 设置缩放选项
+			options := &ebiten.DrawImageOptions{}
+			// 计算缩放比例
+			scaleX := float64(32) / float64(playerImg.Bounds().Dx())
+			scaleY := float64(32) / float64(playerImg.Bounds().Dy())
+			options.GeoM.Scale(scaleX, scaleY)
+			// 将原始图片绘制到指定大小的缓冲区
+			playerImage.DrawImage(ebiten.NewImageFromImage(playerImg), options)
+		}
 	}
 }
 

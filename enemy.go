@@ -1,13 +1,11 @@
 package main
 
 import (
-	"image/color"
 	"math"
 	"math/rand"
 	"time"
 
 	"github.com/hajimehoshi/ebiten/v2"
-	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
 )
 
 // Enemy 表示敌机
@@ -47,8 +45,9 @@ func (e *Enemy) Update() {
 
 // Draw 绘制敌机
 func (e *Enemy) Draw(screen *ebiten.Image) {
-	// 临时使用一个简单的红色矩形代表敌机
-	ebitenutil.DrawRect(screen, e.x, e.y, float64(e.width), float64(e.height), color.RGBA{255, 0, 0, 255})
+	options := &ebiten.DrawImageOptions{}
+	options.GeoM.Translate(e.x, e.y)
+	screen.DrawImage(enemyImage, options)
 }
 
 // EnemyManager 管理所有敌机

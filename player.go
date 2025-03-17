@@ -1,10 +1,7 @@
 package main
 
 import (
-	"image/color"
-
 	"github.com/hajimehoshi/ebiten/v2"
-	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
 )
 
 // Player 表示玩家控制的飞机
@@ -76,6 +73,7 @@ func (p *Player) Update() {
 
 // Draw 绘制玩家飞机
 func (p *Player) Draw(screen *ebiten.Image) {
-	// 临时使用一个简单的蓝色矩形代表玩家飞机
-	ebitenutil.DrawRect(screen, p.x, p.y, float64(p.width), float64(p.height), color.RGBA{0, 0, 255, 255})
+	options := &ebiten.DrawImageOptions{}
+	options.GeoM.Translate(p.x, p.y)
+	screen.DrawImage(playerImage, options)
 }
