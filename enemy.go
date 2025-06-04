@@ -5,6 +5,8 @@ import (
 	"math/rand"
 	"time"
 
+	"image/color"
+
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
@@ -48,6 +50,27 @@ func (e *Enemy) Draw(screen *ebiten.Image) {
 	options := &ebiten.DrawImageOptions{}
 	options.GeoM.Translate(e.x, e.y)
 	screen.DrawImage(enemyImage, options)
+
+	// 绘制血条
+	barWidth := float64(e.width)
+	barHeight := 5.0
+	barX := e.x
+	barY := e.y - barHeight - 2
+
+	// 血条背景（灰色）
+	for y := barY; y < barY+barHeight; y++ {
+		for x := barX; x < barX+barWidth; x++ {
+			screen.Set(int(x), int(y), color.RGBA{100, 100, 100, 255})
+		}
+	}
+
+	// 当前血量（红色）
+	healthWidth := barWidth * float64(e.health) / 2.0
+	for y := barY; y < barY+barHeight; y++ {
+		for x := barX; x < barX+healthWidth; x++ {
+			screen.Set(int(x), int(y), color.RGBA{255, 0, 0, 255})
+		}
+	}
 }
 
 // EnemyManager 管理所有敌机
