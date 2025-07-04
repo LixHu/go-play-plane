@@ -214,7 +214,7 @@ func (g *Game) Update() error {
 	// 如果游戏已结束，处理重新开始或返回菜单的输入
 	if g.isGameOver {
 		// 按空格键重新开始当前模式
-		if ebiten.IsKeyPressed(ebiten.KeySpace) {
+		if ebiten.IsKeyPressed(ebiten.KeyR) {
 			// 重置游戏状态
 			g.player = NewPlayer()
 			g.enemyManager = NewEnemyManager()
@@ -557,7 +557,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		text.Draw(screen, scoreMsg, chineseFont, scoreX, scoreY, color.RGBA{255, 255, 0, 255})
 
 		// 绘制操作提示
-		restartMsg := "按空格键重新开始当前模式"
+		restartMsg := "按R重新开始当前模式"
 		restartX := screenWidth/2 - 150
 		restartY := screenHeight/2 + 50
 		menuMsg := "按ESC键返回模式选择"
