@@ -2,7 +2,7 @@ package main
 
 import (
 	"image/color"
-	"math"
+	//"math"
 	"math/rand"
 	"time"
 
@@ -12,25 +12,29 @@ import (
 
 // Enemy 表示敌机
 type Enemy struct {
-	x      float64
-	y      float64
-	speed  float64
-	width  int
-	height int
-	active bool
-	health int // 敌机血量
+	x         float64
+	y         float64
+	speed     float64
+	width     int
+	height    int
+	active    bool
+	health    int // 当前血量
+	maxHealth int // 最大血量
 }
 
 // NewEnemy 创建一个新的敌机
 func NewEnemy() *Enemy {
+	// 默认血量为2
+	defaultHealth := 2
 	return &Enemy{
-		x:      float64(rand.Intn(screenWidth - 32)),
-		y:      -32,
-		speed:  2,
-		width:  32,
-		height: 32,
-		active: true,
-		health: 2, // 默认血量为2，用于显示血条
+		x:         float64(rand.Intn(screenWidth - 32)),
+		y:         -32,
+		speed:     2,
+		width:     32,
+		height:    32,
+		active:    true,
+		health:    defaultHealth, // 当前血量
+		maxHealth: defaultHealth, // 最大血量与当前血量相同
 	}
 }
 
@@ -52,14 +56,31 @@ func (e *Enemy) Draw(screen *ebiten.Image) {
 	options.GeoM.Translate(e.x, e.y)
 	screen.DrawImage(enemyImage, options)
 
-	// 绘制血条背景（灰色）
-	ebitenutil.DrawRect(screen, e.x, e.y-8, float64(e.width), 5, color.RGBA{100, 100, 100, 200})
+	// 血条宽度与敌机相同
+	bloodBarWidth := float64(e.width)
+	const bloodBarHeight = 5.0
 
-	// 计算当前血量对应的血条长度
-	healthWidth := float64(e.width) * float64(e.health) / 2.0 // 假设满血是2点
+	// 先绘制整个血条的灰色背景（表示总血量）
+	ebitenutil.DrawRect(screen, e.x, e.y-8, bloodBarWidth, bloodBarHeight, color.RGBA{100, 100, 100, 200})
 
-	// 绘制血条（红色）
-	ebitenutil.DrawRect(screen, e.x, e.y-8, healthWidth, 5, color.RGBA{255, 0, 0, 255})
+	// 计算当前血量比例
+	healthRatio := float64(e.health) / float64(e.maxHealth)
+	healthWidth := bloodBarWidth * healthRatio
+
+	// 根据健康比例变化颜色
+	// 满血时是绿色(0,255,0)，血量越低越变红
+	var healthColor color.RGBA
+	if healthRatio == 1.0 {
+		// 满血时显示绿色
+		healthColor = color.RGBA{0, 255, 0, 255}
+	} else {
+		// 非满血时从黄色渐变到红色
+		greenValue := uint8(200 * healthRatio)
+		healthColor = color.RGBA{255, greenValue, 0, 255}
+	}
+
+	// 绘制健康部分
+	ebitenutil.DrawRect(screen, e.x, e.y-8, healthWidth, bloodBarHeight, healthColor)
 }
 
 // EnemyManager 管理所有敌机
@@ -71,7 +92,6 @@ type EnemyManager struct {
 	gameTime      int     // 游戏时间计数器（以帧为单位）
 	maxEnemies    int     // 同时存在的最大敌机数量
 	level         int     // 当前关卡
-	healthScale   float64 // 血量缩放因子
 }
 
 // NewEnemyManager 创建一个新的敌机管理器
@@ -85,7 +105,6 @@ func NewEnemyManager() *EnemyManager {
 		gameTime:      0,   // 初始游戏时间
 		maxEnemies:    10,  // 初始最大敌机数量
 		level:         1,   // 初始关卡
-		healthScale:   1.0, // 初始血量缩放因子
 	}
 }
 
@@ -93,11 +112,6 @@ func NewEnemyManager() *EnemyManager {
 func (em *EnemyManager) Update() {
 	// 更新游戏时间
 	em.gameTime++
-
-	// 每600帧（10秒）增加一次敌机血量
-	if em.gameTime%600 == 0 {
-		em.healthScale *= 1.5 // 血量增加1.5倍
-	}
 
 	// 更新现有敌机
 	for i := len(em.enemies) - 1; i >= 0; i-- {
@@ -114,8 +128,18 @@ func (em *EnemyManager) Update() {
 		enemy := NewEnemy()
 		// 根据难度调整敌机速度
 		enemy.speed *= em.difficulty
-		// 根据时间调整敌机血量
-		enemy.health = int(math.Round(float64(enemy.health) * em.healthScale))
+		// 根据时间和关卡调整敌机血量
+		baseHealth := 2                     // 基础血量
+		levelBonus := em.level - 1          // 关卡加成
+		timeBonus := int(em.gameTime / 600) // 时间加成，每10秒
+		calculatedHealth := baseHealth + levelBonus + timeBonus
+		// 限制最大血量，防止过高
+		calculatedHealth = min(calculatedHealth, 20)
+
+		// 设置当前血量和最大血量
+		enemy.health = calculatedHealth
+		enemy.maxHealth = calculatedHealth
+
 		em.enemies = append(em.enemies, enemy)
 		em.spawnTimer = 0
 	}
