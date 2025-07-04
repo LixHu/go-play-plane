@@ -1,13 +1,13 @@
 package main
 
 import (
+	"image/color"
 	"math"
 	"math/rand"
 	"time"
 
-	"image/color"
-
 	"github.com/hajimehoshi/ebiten/v2"
+	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
 )
 
 // Enemy 表示敌机
@@ -30,7 +30,7 @@ func NewEnemy() *Enemy {
 		width:  32,
 		height: 32,
 		active: true,
-		health: 2, // 提高初始血量
+		health: 2, // 默认血量为2，用于显示血条
 	}
 }
 
@@ -47,30 +47,19 @@ func (e *Enemy) Update() {
 
 // Draw 绘制敌机
 func (e *Enemy) Draw(screen *ebiten.Image) {
+	// 绘制敌机图像
 	options := &ebiten.DrawImageOptions{}
 	options.GeoM.Translate(e.x, e.y)
 	screen.DrawImage(enemyImage, options)
 
-	// 绘制血条
-	barWidth := float64(e.width)
-	barHeight := 5.0
-	barX := e.x
-	barY := e.y - barHeight - 2
+	// 绘制血条背景（灰色）
+	ebitenutil.DrawRect(screen, e.x, e.y-8, float64(e.width), 5, color.RGBA{100, 100, 100, 200})
 
-	// 血条背景（灰色）
-	for y := barY; y < barY+barHeight; y++ {
-		for x := barX; x < barX+barWidth; x++ {
-			screen.Set(int(x), int(y), color.RGBA{100, 100, 100, 255})
-		}
-	}
+	// 计算当前血量对应的血条长度
+	healthWidth := float64(e.width) * float64(e.health) / 2.0 // 假设满血是2点
 
-	// 当前血量（红色）
-	healthWidth := barWidth * float64(e.health) / 2.0
-	for y := barY; y < barY+barHeight; y++ {
-		for x := barX; x < barX+healthWidth; x++ {
-			screen.Set(int(x), int(y), color.RGBA{255, 0, 0, 255})
-		}
-	}
+	// 绘制血条（红色）
+	ebitenutil.DrawRect(screen, e.x, e.y-8, healthWidth, 5, color.RGBA{255, 0, 0, 255})
 }
 
 // EnemyManager 管理所有敌机

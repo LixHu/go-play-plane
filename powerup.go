@@ -16,9 +16,10 @@ var score int
 type PowerUpType int
 
 const (
-	MultiShot   PowerUpType = iota // 多弹道
-	ScreenShot                     // 全屏攻击
-	AttackBoost                    // 攻击力增强
+	MultiShot    PowerUpType = iota // 多弹道
+	ScreenShot                      // 全屏攻击
+	AttackBoost                     // 攻击力增强
+	ClearBullets                    // 清除全屏子弹
 )
 
 // PowerUp 表示道具
@@ -81,6 +82,8 @@ func (pm *PowerUpManager) SpawnPowerUp(x, y float64) {
 			pm.powerUps = append(pm.powerUps, NewPowerUp(x, y, AttackBoost))
 		} else if randVal < 0.3005 { // 30%概率掉落全屏攻击道具
 			pm.powerUps = append(pm.powerUps, NewPowerUp(x, y, ScreenShot))
+		} else if randVal < 0.4005 { // 10%概率掉落清除子弹道具
+			pm.powerUps = append(pm.powerUps, NewPowerUp(x, y, ClearBullets))
 		} else { // 其余概率掉落多弹道道具
 			pm.powerUps = append(pm.powerUps, NewPowerUp(x, y, MultiShot))
 		}
@@ -117,6 +120,8 @@ func (p *PowerUp) Draw(screen *ebiten.Image) {
 		powerUpColor = color.RGBA{0, 0, 255, 255} // 蓝色
 	case AttackBoost:
 		powerUpColor = color.RGBA{128, 0, 128, 255} // 紫色
+	case ClearBullets:
+		powerUpColor = color.RGBA{255, 165, 0, 255} // 橙色
 	}
 
 	// 绘制道具
