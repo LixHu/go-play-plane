@@ -1,3 +1,22 @@
 .idea/
+# 编译后的可执行文件
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
 
+# 打包后的目录
+dist/
+
+# Fyne输出的临时文件
+fyne-cross/
+
+# 编辑器临时文件
+.vscode/
+.idea/
+*.swp
+
+# Go相关文件
+/vendor/
 .git/
