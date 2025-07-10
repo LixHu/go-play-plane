@@ -28,9 +28,10 @@ const (
 type GameMode int
 
 const (
-	ModeMenu    GameMode = iota // 菜单模式
-	ModeLevels                  // 关卡模式
-	ModeEndless                 // 无尽模式
+	ModeMenu        GameMode = iota // 菜单模式
+	ModeLevelSelect                 // 关卡选择模式
+	ModePlaying                     // 游戏进行中模式
+	ModeEndless                     // 无尽模式
 )
 
 var (
@@ -38,6 +39,7 @@ var (
 	chineseFont font.Face
 	enemyImage  *ebiten.Image
 	playerImage *ebiten.Image
+	game        *Game // 全局游戏实例，用于其他模块引用
 )
 
 func init() {
@@ -146,6 +148,13 @@ type Game struct {
 	currentLevel       int      // 当前关卡（仅用于关卡模式）
 	difficulty         float64  // 游戏难度系数
 	targetScore        int      // 当前关卡目标分数
+	// BOSS相关字段
+	boss               *Boss // 当前关卡BOSS
+	bossActive         bool  // BOSS是否已出现
+	bossDefeated       bool  // BOSS是否已被击败
+	bossScoreThreshold int   // 触发BOSS的分数阈值
+	// 菜单相关字段
+	levelSelectMenu *LevelSelectMenu // 关卡选择菜单
 	// 启动动画相关字段
 	animTimer      int          // 动画计时器
 	titleScale     float64      // 标题缩放
@@ -195,15 +204,17 @@ func (g *Game) Update() error {
 		}
 
 		// 按1选择关卡模式或鼠标点击
-		if (ebiten.IsKeyPressed(ebiten.Key1) && g.menuItemsAlpha >= 0.9) || (ebiten.IsMouseButtonPressed(ebiten.MouseButtonLeft) && g.checkMouseInArea(screenWidth/2-150, screenHeight/2+20, 320, 40)) {
-			g.gameMode = ModeLevels
-			g.currentLevel = 1
-			g.targetScore = g.currentLevel * 1000 // 每关目标分数为关卡数 * 1000
-			g.enemyManager.SetLevel(g.currentLevel)
+		if (ebiten.IsKeyPressed(ebiten.Key1) && g.menuItemsAlpha >= 0.9) || (ebiten.IsMouseButtonPressed(ebiten.MouseButtonLeft) && g.checkMouseInArea(screenWidth/2-170, screenHeight/2+20, 340, 40)) {
+			// 进入关卡选择模式
+			g.gameMode = ModeLevelSelect
+			// 初始化关卡选择菜单
+			if g.levelSelectMenu == nil {
+				g.levelSelectMenu = NewLevelSelectMenu()
+			}
 			return nil
 		}
 		// 按2选择无尽模式或鼠标点击
-		if (ebiten.IsKeyPressed(ebiten.Key2) && g.menuItemsAlpha >= 0.9) || (ebiten.IsMouseButtonPressed(ebiten.MouseButtonLeft) && g.checkMouseInArea(screenWidth/2-150, screenHeight/2+70, 320, 40)) {
+		if (ebiten.IsKeyPressed(ebiten.Key2) && g.menuItemsAlpha >= 0.9) || (ebiten.IsMouseButtonPressed(ebiten.MouseButtonLeft) && g.checkMouseInArea(screenWidth/2-170, screenHeight/2+70, 340, 40)) {
 			g.gameMode = ModeEndless
 			g.difficulty = 1.0
 			return nil
@@ -211,9 +222,19 @@ func (g *Game) Update() error {
 		return nil
 	}
 
+	// 在关卡选择模式下处理选择逻辑
+	if g.gameMode == ModeLevelSelect {
+		// 更新关卡选择菜单
+		if g.levelSelectMenu.Update(g) {
+			// 如果返回true，表示已完成选择或返回主菜单
+			return nil
+		}
+		return nil
+	}
+
 	// 如果游戏已结束，处理重新开始或返回菜单的输入
 	if g.isGameOver {
-		// 按空格键重新开始当前模式
+		// 按R键重新开始当前模式
 		if ebiten.IsKeyPressed(ebiten.KeyR) {
 			// 重置游戏状态
 			g.player = NewPlayer()
@@ -223,51 +244,132 @@ func (g *Game) Update() error {
 			g.powerUpManager = NewPowerUpManager()
 			g.score = 0
 			g.isGameOver = false
-			if g.gameMode == ModeLevels {
-				g.currentLevel = 1
+			g.bossActive = false
+			g.bossDefeated = false
+			g.boss = nil
+			if g.gameMode == ModePlaying {
+				// 重置当前关卡
 				g.targetScore = g.currentLevel * 1000
+				g.bossScoreThreshold = g.targetScore / 2
 				g.enemyManager.SetLevel(g.currentLevel)
 			}
 		}
-		// 按ESC键返回模式选择界面
+		// 按ESC键返回菜单
 		if ebiten.IsKeyPressed(ebiten.KeyEscape) {
-			g.gameMode = ModeMenu
+			if g.gameMode == ModePlaying {
+				// 从关卡模式返回关卡选择
+				g.gameMode = ModeLevelSelect
+			} else {
+				// 从无尽模式返回主菜单
+				g.gameMode = ModeMenu
+			}
 			g.isGameOver = false
 			g.score = 0
 		}
 		return nil
 	}
 
+	// 游戏进行中，更新所有游戏元素
 	// 更新玩家状态
 	g.player.Update()
 
-	// 更新敌机状态
-	g.enemyManager.Update()
+	// 只有在BOSS没有出现时才生成普通敌机
+	if !g.bossActive {
+		// 更新敌机状态
+		g.enemyManager.Update()
+	} else {
+		// 如果BOSS已经出现，更新BOSS状态
+		if g.boss != nil && g.boss.active {
+			g.boss.Update(g.player, g.enemyBulletManager)
+		}
+	}
 
 	// 更新子弹状态
 	g.bulletManager.Update(g.player)
+
+	// 更新敌方子弹状态
+	if g.bossActive {
+		// Boss激活时也需要更新子弹状态
+		g.enemyBulletManager.Update(nil)
+	} else {
+		g.enemyBulletManager.Update(g.enemyManager.enemies)
+	}
 
 	// 更新道具状态
 	g.powerUpManager.Update()
 
 	// 检测子弹与敌机的碰撞
 	for _, bullet := range g.bulletManager.bullets {
-		for _, enemy := range g.enemyManager.enemies {
-			if bullet.CheckCollision(enemy) {
-				bullet.active = false
-				enemy.health -= 1      // 减少敌机血量
-				if enemy.health <= 0 { // 只有当血量为0时才销毁敌机
-					enemy.active = false
-					g.score += 100
-					// 在敌机被击毁的位置生成道具
-					g.powerUpManager.SpawnPowerUp(enemy.x, enemy.y)
+		// 检测与普通敌机的碰撞
+		if !g.bossActive {
+			for _, enemy := range g.enemyManager.enemies {
+				if bullet.CheckCollision(enemy) {
+					bullet.active = false
+					enemy.health -= 1      // 减少敌机血量
+					if enemy.health <= 0 { // 只有当血量为0时才销毁敌机
+						enemy.active = false
+						g.score += 100
+						// 在敌机被击毁的位置生成道具
+						g.powerUpManager.SpawnPowerUp(enemy.x, enemy.y)
 
-					// 在关卡模式下检查是否达到目标分数
-					if g.gameMode == ModeLevels && g.score >= g.targetScore {
-						// 进入下一关
-						g.currentLevel++
-						g.targetScore = g.currentLevel * 1000
-						g.enemyManager.SetLevel(g.currentLevel)
+						// 关卡模式下，检查是否达到触发BOSS的分数
+						if g.gameMode == ModePlaying && g.score >= g.bossScoreThreshold && !g.bossActive && !g.bossDefeated {
+							// 触发BOSS战
+							g.bossActive = true
+							// 根据当前关卡创建对应的BOSS
+							bossType := BossType(g.currentLevel - 1)
+							if int(bossType) >= 4 {
+								bossType = BossType4 // 最多支持4种BOSS类型
+							}
+							g.boss = NewBoss(bossType)
+						}
+					}
+				}
+			}
+		}
+
+		// 检测与BOSS的碰撞
+		if g.bossActive && g.boss != nil && g.boss.active {
+			// 检查子弹是否与BOSS发生碰撞
+			if bullet.x < g.boss.x+float64(g.boss.width) &&
+				bullet.x+float64(bullet.width) > g.boss.x &&
+				bullet.y < g.boss.y+float64(g.boss.height) &&
+				bullet.y+float64(bullet.height) > g.boss.y {
+
+				bullet.active = false
+				g.boss.health -= g.player.attackPower // 减少BOSS血量，考虑玩家攻击力
+
+				// 检查BOSS是否被击败
+				if g.boss.health <= 0 {
+					g.boss.active = false
+					g.bossDefeated = true
+					g.score += 2000 // BOSS奖励分数
+
+					// 在BOSS位置生成多个道具
+					for i := 0; i < 5; i++ {
+						offsetX := float64(rand.Intn(g.boss.width))
+						offsetY := float64(rand.Intn(g.boss.height))
+						g.powerUpManager.SpawnPowerUp(g.boss.x+offsetX, g.boss.y+offsetY)
+					}
+
+					// 在关卡模式下，检查是否需要进入下一关
+					if g.gameMode == ModePlaying {
+						// 检查是否是最后一关
+						if g.currentLevel < 4 { // 假设总共有4关
+							// 进入下一关
+							g.currentLevel++
+							g.targetScore = g.currentLevel * 1000
+							g.bossScoreThreshold = g.targetScore / 2
+							g.enemyManager.SetLevel(g.currentLevel)
+							g.bossActive = false
+							g.bossDefeated = false
+						} else {
+							// 通关所有关卡，返回关卡选择
+							// 可以显示一个胜利画面，这里简化处理
+							g.gameMode = ModeLevelSelect
+							g.currentLevel = 1
+							g.score = 0
+						}
 					}
 				}
 			}
@@ -289,15 +391,24 @@ func (g *Game) Update() error {
 	}
 
 	// 检测玩家与敌机的碰撞
-	for _, enemy := range g.enemyManager.enemies {
-		if enemy.active && g.checkPlayerCollision(enemy) {
+	if !g.bossActive {
+		for _, enemy := range g.enemyManager.enemies {
+			if enemy.active && g.checkPlayerCollision(enemy) {
+				g.isGameOver = true
+				break
+			}
+		}
+	} else if g.boss != nil && g.boss.active {
+		// 检测玩家与BOSS的碰撞
+		if g.player.x < g.boss.x+float64(g.boss.width) &&
+			g.player.x+float64(g.player.width) > g.boss.x &&
+			g.player.y < g.boss.y+float64(g.boss.height) &&
+			g.player.y+float64(g.player.height) > g.boss.y {
 			g.isGameOver = true
-			break
 		}
 	}
 
-	// 更新敌机子弹状态
-	g.enemyBulletManager.Update(g.enemyManager.enemies)
+	// 敌机子弹状态已在前面更新，这里不需要重复
 
 	// 检测敌机子弹与玩家的碰撞
 	for _, bullet := range g.enemyBulletManager.bullets {
@@ -446,8 +557,8 @@ func (g *Game) Draw(screen *ebiten.Image) {
 			mode2BgColor = color.RGBA{50, 50, 150, menuAlpha}
 		}
 
-		ebitenutil.DrawRect(screen, float64(mode1X-10), float64(mode1Y-25), 320, 40, mode1BgColor)
-		ebitenutil.DrawRect(screen, float64(mode2X-10), float64(mode2Y-25), 320, 40, mode2BgColor)
+		ebitenutil.DrawRect(screen, float64(mode1X-20), float64(mode1Y-25), 340, 40, mode1BgColor)
+		ebitenutil.DrawRect(screen, float64(mode2X-20), float64(mode2Y-25), 340, 40, mode2BgColor)
 
 		// 绘制模式选项文字
 		text.Draw(screen, mode1, chineseFont, mode1X, mode1Y, color.RGBA{255, 255, 0, menuAlpha})
@@ -495,11 +606,24 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		return
 	}
 
+	// 关卡选择模式
+	if g.gameMode == ModeLevelSelect {
+		// 绘制关卡选择菜单
+		g.levelSelectMenu.Draw(screen)
+		return
+	}
+
 	// 绘制玩家
 	g.player.Draw(screen)
 
-	// 绘制敌机
-	g.enemyManager.Draw(screen)
+	// 只有在BOSS没有出现时才绘制普通敌机
+	if !g.bossActive {
+		// 绘制敌机
+		g.enemyManager.Draw(screen)
+	} else if g.boss != nil && g.boss.active {
+		// 绘制BOSS
+		g.boss.Draw(screen)
+	}
 
 	// 绘制子弹
 	g.bulletManager.Draw(screen)
@@ -519,7 +643,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	text.Draw(screen, scoreText, chineseFont, scoreX, scoreY, color.RGBA{255, 255, 0, 255})
 
 	// 在关卡模式下显示当前关卡和目标分数
-	if g.gameMode == ModeLevels {
+	if g.gameMode == ModeLevelSelect {
 		levelText := fmt.Sprintf("当前关卡: %d", g.currentLevel)
 		levelX := 20
 		levelY := 70
@@ -588,7 +712,8 @@ func main() {
 		starPositions[i] = [2]float64{float64(rand.Intn(screenWidth)), float64(rand.Intn(screenHeight))}
 	}
 
-	game := &Game{
+	// 创建游戏实例并设置全局引用
+	game = &Game{
 		player:             NewPlayer(),
 		enemyManager:       NewEnemyManager(),
 		bulletManager:      NewBulletManager(),
@@ -599,6 +724,10 @@ func main() {
 		gameMode:           ModeMenu,
 		currentLevel:       1,
 		difficulty:         1.0,
+		// BOSS相关初始化
+		bossActive:         false,
+		bossDefeated:       false,
+		bossScoreThreshold: 500, // 默认在得分500时触发BOSS
 		// 初始化动画参数
 		animTimer:      0,
 		titleScale:     0.1,

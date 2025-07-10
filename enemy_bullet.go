@@ -1,22 +1,24 @@
 package main
 
 import (
-	"image/color"
-	"math"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
+	"image/color"
+	"math"
 	"math/rand"
 )
 
 // EnemyBullet 表示敌机发射的子弹
 type EnemyBullet struct {
-	x float64
-	y float64
-	speedX float64
-	speedY float64
-	width int
-	height int
-	active bool
+	x        float64
+	y        float64
+	speedX   float64
+	speedY   float64
+	width    int
+	height   int
+	active   bool
+	color    color.RGBA // 子弹颜色
+	isHoming bool       // 是否为追踪子弹
 }
 
 // NewEnemyBullet 创建一个新的敌机子弹
@@ -29,13 +31,45 @@ func NewEnemyBullet(x, y float64) *EnemyBullet {
 	baseSpeed := 4.0
 
 	return &EnemyBullet{
-		x: x,
-		y: y,
-		speedX: baseSpeed * math.Sin(radian),
-		speedY: baseSpeed * math.Cos(radian),
-		width: 4,
-		height: 4, // 修改为正方形，便于旋转
-		active: true,
+		x:        x,
+		y:        y,
+		speedX:   baseSpeed * math.Sin(radian),
+		speedY:   baseSpeed * math.Cos(radian),
+		width:    4,
+		height:   4, // 修改为正方形，便于旋转
+		active:   true,
+		color:    color.RGBA{255, 0, 0, 255}, // 默认红色
+		isHoming: false,
+	}
+}
+
+// NewEnemyBulletCustom 创建一个自定义方向和速度的敌机子弹
+func NewEnemyBulletCustom(x, y, angle, speed float64, bulletColor color.RGBA) *EnemyBullet {
+	return &EnemyBullet{
+		x:        x,
+		y:        y,
+		speedX:   speed * math.Cos(angle),
+		speedY:   speed * math.Sin(angle),
+		width:    6,
+		height:   6,
+		active:   true,
+		color:    bulletColor,
+		isHoming: false,
+	}
+}
+
+// NewEnemyBulletHoming 创建一个追踪玩家的敌机子弹
+func NewEnemyBulletHoming(x, y, angle float64, bulletColor color.RGBA) *EnemyBullet {
+	return &EnemyBullet{
+		x:        x,
+		y:        y,
+		speedX:   3.0 * math.Cos(angle),
+		speedY:   3.0 * math.Sin(angle),
+		width:    8,
+		height:   8,
+		active:   true,
+		color:    bulletColor,
+		isHoming: true,
 	}
 }
 
@@ -69,10 +103,61 @@ func (b *EnemyBullet) Update() {
 	}
 }
 
+// UpdateHoming 更新追踪子弹的状态，使其朝向玩家
+func (b *EnemyBullet) UpdateHoming(player *Player) {
+	// 只有追踪子弹才执行此逻辑
+	if b.isHoming {
+		// 计算到玩家的方向
+		playerCenterX := player.x + float64(player.width)/2
+		playerCenterY := player.y + float64(player.height)/2
+		bulletCenterX := b.x + float64(b.width)/2
+		bulletCenterY := b.y + float64(b.height)/2
+
+		// 计算方向向量
+		dx := playerCenterX - bulletCenterX
+		dy := playerCenterY - bulletCenterY
+
+		// 计算距离
+		distance := math.Sqrt(dx*dx + dy*dy)
+
+		// 防止除以零
+		if distance > 0 {
+			// 归一化方向向量
+			dx /= distance
+			dy /= distance
+
+			// 计算当前速度大小
+			speed := math.Sqrt(b.speedX*b.speedX + b.speedY*b.speedY)
+
+			// 缓慢转向玩家（增加追踪性）
+			turnFactor := 0.1 // 转向因子，越大转向越快
+			b.speedX = b.speedX*(1-turnFactor) + dx*speed*turnFactor
+			b.speedY = b.speedY*(1-turnFactor) + dy*speed*turnFactor
+		}
+	}
+
+	// 调用基本的更新方法
+	b.Update()
+}
+
 // Draw 绘制敌机子弹
 func (b *EnemyBullet) Draw(screen *ebiten.Image) {
-	// 使用红色矩形代表敌机子弹
-	ebitenutil.DrawRect(screen, b.x, b.y, float64(b.width), float64(b.height), color.RGBA{255, 0, 0, 255})
+	// 使用自定义颜色绘制子弹
+	bulletColor := b.color
+	// 如果颜色为空值，使用默认红色
+	if bulletColor.A == 0 {
+		bulletColor = color.RGBA{255, 0, 0, 255}
+	}
+
+	// 绘制子弹
+	ebitenutil.DrawRect(screen, b.x, b.y, float64(b.width), float64(b.height), bulletColor)
+
+	// 如果是追踪子弹，添加发光效果
+	if b.isHoming {
+		// 绘制外发光
+		glowColor := color.RGBA{bulletColor.R, bulletColor.G, bulletColor.B, 100}
+		ebitenutil.DrawRect(screen, b.x-2, b.y-2, float64(b.width)+4, float64(b.height)+4, glowColor)
+	}
 }
 
 // CheckCollision 检查子弹是否与玩家发生碰撞
@@ -102,9 +187,21 @@ func NewEnemyBulletManager() *EnemyBulletManager {
 
 // Update 更新所有敌机子弹的状态
 func (bm *EnemyBulletManager) Update(enemies []*Enemy) {
+	// 获取玩家实例（为追踪子弹使用）
+	var player *Player
+	if game != nil {
+		player = game.player
+	}
+
 	// 更新现有子弹
 	for i := len(bm.bullets) - 1; i >= 0; i-- {
-		bm.bullets[i].Update()
+		// 根据子弹类型调用不同的更新方法
+		if bm.bullets[i].isHoming && player != nil {
+			bm.bullets[i].UpdateHoming(player)
+		} else {
+			bm.bullets[i].Update()
+		}
+
 		// 移除非活动子弹
 		if !bm.bullets[i].active {
 			bm.bullets = append(bm.bullets[:i], bm.bullets[i+1:]...)
@@ -112,12 +209,14 @@ func (bm *EnemyBulletManager) Update(enemies []*Enemy) {
 	}
 
 	// 随机让敌机发射子弹
-	for _, enemy := range enemies {
-		if enemy.active && rand.Float64() < 0.01 { // 1%的概率发射子弹
-			// 从敌机的中心位置发射子弹
-			bulletX := enemy.x + float64(enemy.width)/2 - 2
-			bulletY := enemy.y + float64(enemy.height)
-			bm.bullets = append(bm.bullets, NewEnemyBullet(bulletX, bulletY))
+	if enemies != nil {
+		for _, enemy := range enemies {
+			if enemy.active && rand.Float64() < 0.01 { // 1%的概率发射子弹
+				// 从敌机的中心位置发射子弹
+				bulletX := enemy.x + float64(enemy.width)/2 - 2
+				bulletY := enemy.y + float64(enemy.height)
+				bm.bullets = append(bm.bullets, NewEnemyBullet(bulletX, bulletY))
+			}
 		}
 	}
 }
